@@ -4,7 +4,7 @@ namespace App\Http\Middleware;
 
 use Closure, Auth,Session,Redirect;
 
-class Directeur
+class Super
 {
     /**
      * Handle an incoming request.
@@ -16,10 +16,10 @@ class Directeur
     public function handle($request, Closure $next)
      {
         if(Auth::check()){
-          if(Auth::user()->user_level > 1){
+          if(Auth::user()->user_level > 4){
             return $next($request);
           }
-          Session::flash('msg', ' Vous devez etre Directeur. ');
+          Session::flash('msg', ' Vous devez etre Superviseur. ');
           return redirect::back();
         }
         Session::flash('msg', ' Vous devez vous connecter. ');

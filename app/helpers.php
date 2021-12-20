@@ -8,6 +8,7 @@ function user_level(){
     dd($users);
 }
 
+
 function get_enseignant(){
   $enseignants = DB::table('enseignants')
               ->join('affectations','affectations.enseignant_id','enseignants.id')
@@ -19,7 +20,7 @@ function get_enseignant(){
               ->join('districts','communes.district_id','districts.id')
               ->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','communes.nom as commune','nomclasse','enseignants.prenom','classes.id as classe_id','enseignants.telephone','sexe', 'nif', 'districts.nom as district','nomf')
               ->get();
-              return $enseignants;
+              return count($enseignants);
 
 }
 
@@ -88,8 +89,19 @@ function get_performance_decisions(){
           ->select('name', 'email', DB::raw('count(classeleve_id) as saisie'))
           ->groupBy('name', 'email')
           ->orderBy('saisie','desc')->get();
+}
+
+
+function get_eleveSecteur(){
+  return DB::table('classeleves')
+             ->select(DB::raw("count(CASE WHEN ecoles.secteur = '0' THEN 1 END ) AS  Prive"),
+                 DB::raw("count(CASE WHEN ecoles.secteur = '1' THEN 1  END) AS Public"))
+                   ->join('ecoles', 'classeleves.ecole_id', 'ecoles.id')
+          ->where('anac',session_new_year())
+          ->get();
 
 }
+
 
 function stat_Elevepar_district($user_id, $type){
   $district_id = \App\Insprincipal::where('user_id', $user_id)->pluck('district_id')[0];
@@ -1544,8 +1556,29 @@ function insert($ModelName, $champfill, $champval){
   }
 }
 
+function stat_decision(){
+    $dec = DB::table('decisions')
+    ->join('classeleves', 'decisions.classeleve_id', 'classeleves.id')
+    ->where('anac',session_new_year())->count();
 
+    $el = \App\Classeleve::where('anac', session_new_year())->count();
 
+    $percent =number_format(( $dec / $el)*100, 2);
+    return  ['percent'=>$percent, 'dec'=>$dec];
+  }
+
+function decision_stat(){
+ $dec= DB::table('decisions')
+       ->select('anac',  DB::raw('count(decisions.id) as nb_decision'))
+       ->join('classeleves', 'decisions.classeleve_id', 'classeleves.id')
+       ->where('anac', session_new_year())
+       ->groupBy('anac')->get();
+
+   // $el = \App\Classeleve::select('anac',  DB::raw('count(id) as nb_el'))
+   //      ->where('anac',session_new_year())->groupBy('anac')->get();;
+
+      return $dec;
+}
 
 
 function stat_ecole_par_district(){
@@ -1719,6 +1752,7 @@ function initialisation_decision($ecole_id,$classe_id,$anac){
   return $n;
 }
 
+
 function get_decision($ecole_id,$classe_id, $anac ){
       $init = initialisation_decision($ecole_id,$classe_id,$anac);
       if($classe_id < 13)
@@ -1795,6 +1829,8 @@ function get_eleve_info1($commune){
             ->get();
            return ($nb_ecole);
 }
+
+
 
 function check_eleve($eleve_id, $anac){
     $classeleve = \App\Classeleve::where('eleve_id',$eleve_id)->where('anac', $anac)->get();
@@ -1994,7 +2030,7 @@ function update_select_mention($decision, $anac){
 
 function promotion_classe($ecole_id, $classe_id, $anac){
   $anacsuiv = annee_suiv($anac);
-  $listedec = get_decision($ecole_id, $classe_id);
+  $listedec = get_decision($ecole_id, $classe_id,$anac);
 
   $n=0;
   foreach($listedec as $dec){
@@ -2169,8 +2205,10 @@ function get_enseignant_by_discom(){
   ->orderBy('nom','asc')
   ->distinct('affectations.enseignant_id')
   ->get();
-  return $enseignants;
+  return count($enseignants);
 }
+
+
 
 function get_enseignant_pdf($district){
   $enseignants = DB::table('affectations')
@@ -2418,12 +2456,14 @@ $query->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','commune
 }
 
 
-function get_liste_enseignant($district, $commune=null, $zone=null,  $ecole = null, $classe = null, $formation = null){
-$query = DB::table('enseignants');
-$query->join('affectations','affectations.enseignant_id','enseignants.id')->join('funiversitaires','funiversitaires.enseignant_id','enseignants.id')->join('classes','affectations.classe_id','classes.id')->join('ecoles','affectations.ecole_id','ecoles.id')->join('zones','ecoles.zone_id','zones.id')->join('communes','zones.commune_id','communes.id')->join('districts','communes.district_id','districts.id');
+function get_liste_enseignant($district, $commune=null, $zone=null, $secteur= -1, $statut =0){
+$query = DB::table('affectations');
 
-$query->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','communes.nom as commune','nomclasse','enseignants.prenom','classes.id as classe_id','enseignants.telephone','sexe', 'nif', 'districts.nom as district','nomf');
+ $query->join('enseignants','affectations.enseignant_id','enseignants.id')->join('statuts','statuts.enseignant_id','enseignants.id')->join('ecoles','affectations.ecole_id','ecoles.id')->join('zones','ecoles.zone_id','zones.id')->join('communes','zones.commune_id','communes.id')->join('districts','communes.district_id','districts.id');
 
+$query->select('enseignants.id','enseignants.nom','enseignants.prenom','enseignants.telephone','sexe', 'nif','date_affectation as date')->distinct('affectations.enseignant_id')->orderBy('enseignants.nom','asc');
+
+  
 
     if($district == 0){
       //$query->get();
@@ -2435,29 +2475,36 @@ $query->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','commune
       elseif($zone ==0){
           $query->where('districts.id', $district)->where('communes.id', $commune);
       }
-      elseif ($ecole == 0) {
-         $query->where('districts.id', $district)->where('communes.id', $commune)->where('zones.id', $zone);
-      }
-      elseif($classe ==0){
-          $query->where('districts.id', $district)->where('communes.id', $commune)->where('zones.id', $zone)->where('ecoles.id', $ecole);
-      }
-
+      
               else{
-                 $query->where('districts.id', $district)->where('communes.id', $commune)->where('zones.id', $zone)->where('ecoles.id', $ecole)->where('classes.id', $classe);
+                 $query->where('districts.id', $district)->where('communes.id', $commune)->where('zones.id', $zone);
               }
 
-    if($classe != 0)
-      $query->where('classes.id',$classe);
+      if ($secteur != -1) {
+         $query->where('secteur', $secteur);
+      }
+
+   
+
+      if ($statut != 0) {
+         $query->where('statuts.statut', $statut);
+      }
+
+     
+    // if($niv !=0){
+    //       if(strlen($niv) != 5)
+    //          $query->where('niveau1', $niv);
+    //       else{
+    //         $c_niveau = check_niveau($niv);
+    //           $query->where('niveau1' ,'like', $c_niveau);
+    //         }
+    //   }
 
 
-    if($formation != '0' && $formation != 1)
-      $query->where('funiversitaires.nomf',$formation);
-    elseif($formation == 1)
-      $query->whereNotIn('funiversitaires.nomf',['ENI','FIA','ENS','Sces de l\'Education']);
+     $listeprof = $query->get();   
+     
+      return $listeprof;
 
-
-     $listeprof = $query->get();
-    return $listeprof;
 }
 
 
@@ -2497,7 +2544,7 @@ $query->join('directeurs','directeurs.ecole_id','ecoles.id')
 ->join('districts','communes.district_id','districts.id')
 ->join('niveauenseignements','niveauenseignements.ecole_id','ecoles.id');
 
-$query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel as Tel Ecole','email as Email Ecole','districts.nom as District','communes.nom as Commune', 'zones.nom as Zone','section_communales.nom as Section_Communale', 'sigle as Sigle', 'fondateur as Fondateur','acces as Acces', 'niveau as Niveau_Enseignement','secteur as Secteur', 'ecoles.longitude as Longitude','ecoles.latitude as Latitude', 'nomd as Nom_Directeur', 'prenom as Prenom_Directeur', 'teld as Tel_Directeur','telephoned as Tel Directeur2','emaild as Email', 'cin as CIN', 'nif as NIF', 'datenais as Date Naissance', 'lieunais as Lieu de Naissance','sexe as Sexe','adressed as Adresse Directeur');
+$query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel as tel','email as Email Ecole','districts.nom as District','communes.nom as Commune', 'zones.nom as Zone','section_communales.nom as Section_Communale', 'sigle as Sigle', 'fondateur as Fondateur','acces as Acces', 'niveau as Niveau_Enseignement','secteur as Secteur', 'ecoles.longitude as Longitude','ecoles.latitude as Latitude', 'nomd as Nom_Directeur', 'prenom as Prenom_Directeur', 'teld as Tel_Directeur','telephoned as Tel Directeur2','emaild as Email', 'cin as CIN', 'nif as NIF', 'datenais as Date Naissance', 'lieunais as Lieu de Naissance','sexe as Sexe','adressed as Adresse Directeur');
 
 
     if($district == 0){
@@ -2546,6 +2593,8 @@ $query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel 
      }
     return $listecole;
 }
+
+
 
 function get_dir(){
   $l = '_1__';
@@ -2663,7 +2712,6 @@ function get_niveau($n){
                    'Secondaire inclus'=>'-1000'];
        if($n==0)
             return $niveau;
-
             return array_merge($niveau, $niveau2);
 }
 
@@ -2696,11 +2744,10 @@ function get_text_ecole($district,$commune=null, $zone=null, $secteur=null, $niv
    if($district != 0){
       $text =$text.', District Scolaire de '.get_nom($district,'District');
     }
-
-
-
   return $text;
 }
+
+
 
 function get_list_enseignant(){
 $query = DB::table('enseignants');
@@ -2711,6 +2758,9 @@ $query->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','commune
  $listeprof = $query->get();
     return $listeprof;
 }
+
+
+
 
 function test(){
   $query = DB::table('enseignants')

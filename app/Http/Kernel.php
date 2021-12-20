@@ -60,6 +60,8 @@ class Kernel extends HttpKernel
         'auth' => \App\Http\Middleware\Authenticate::class,
         'direct' => \App\Http\Middleware\Directeur::class,
         'admin' => \App\Http\Middleware\Admin::class,
+        'ip' => \App\Http\Middleware\Ip::class,
+        'sup' => \App\Http\Middleware\Super::class,
         'inspect' => \App\Http\Middleware\Inspecteur::class,
         'auth.basic' => \Illuminate\Auth\Middleware\AuthenticateWithBasicAuth::class,
         'bindings' => \Illuminate\Routing\Middleware\SubstituteBindings::class,

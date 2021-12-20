@@ -22,7 +22,7 @@ Route::get('hash', function () {
 });
 
 Route::get('test', function () {
-    return get_district_by_dept(04);
+    return 'Serveur ok';
 });
 
 
@@ -37,5 +37,5 @@ Route::get('/test-niv',function () {
 
 
 Route::get('test-help', function () {    
-      return get_enseignant();
+      return get_liste_enseignant(41);
 });

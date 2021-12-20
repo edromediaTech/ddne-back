@@ -20,8 +20,7 @@ Route::get('/test', function(){
 
 
 Route::get('/get-anac', function(){
-   return session_new_year();
-        
+   return session_new_year();        
 });
 
 
@@ -29,18 +28,27 @@ Route::get('/get-anac', function(){
 // statistisques =======================================
  Route::get('/get-info',function(){   
              $ecoles =\App\Ecole::all()->count(); 
+             $enseignants =\App\Enseignant::all()->count(); 
              $eleves = \App\Eleve::all()->count();    
              $filles = \App\Eleve::where('sexe',0)->count();
                $elevedis = stat_eleve_par_district();    
-               $ecoledis = stat_ecole_par_district();    
-          return response()->json(['filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis]);
+               $ecoledis = stat_ecole_par_district();  
+               $deci = stat_decision(); 
+              $secteur =  get_eleveSecteur(); 
+          return response()->json(['filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis,'enseignants'=>$enseignants, 'deci'=>$deci, 'secteur'=>$secteur]);
              });
 
 
 // register =================================
 Route::post('register', 'nRegisterController@register')->name('register');
+  
+//Route::group(['middleware' => ['auth:api']], function () {
+    Route::get('/get-rapportecole/{id}', 'EcoleController@rapportEcole');
 
-Route::group(['middleware' => ['auth:api']], function () {
+//}) 
+
+
+Route::group(['middleware' => ['auth:api','ip']], function () {
     Route::get('/get-info-ip/{id}',function($id){              
             $type = \App\Insprincipal::where('user_id', $id)->get()[0];
                  $eleves = stat_elevepar_district($id,$type->type);
@@ -69,13 +77,12 @@ Route::get('/ecole-ip/{id}',function($id){
 
 Route::post('store-ip', 'InsprincipalController@store')->name('storeIp');
 
-
 });
 
 
 
  // ============== inspecteur =====================================================
-//Route::group(['middleware' => ['auth:api','inspect']], function () {
+Route::group(['middleware' => ['auth:api','inspect']], function () {
     Route::post('store-inspect', 'InspecteurController@storeInspect')->name('storeInspect');
     Route::patch('valider-transfert/{id}', 'TransfertController@valider')->name('validerTransfert');
 // stat inspecteur =============================
@@ -109,8 +116,40 @@ Route::post('store-ip', 'InsprincipalController@store')->name('storeIp');
    });
 
 
-//});
+});
 
+
+
+// ============================ super ====================================================
+
+Route::group(['middleware' => ['auth:api','sup']], function () {
+
+ Route::get('/get-ecole', 'EcoleController@listeEcole');
+   
+     Route::get('/get-rapportenseignant/{id}', 'EcoleController@rapportEnseignant');
+     Route::get('/get-text/{id}', 'EcoleController@get_text');
+     Route::get('/get-enseignant', 'EcoleController@get_enseignant');
+   
+
+
+    Route::get('/get-niveauens',function(){
+                $niveau = get_niveau(1);
+                return response()->json($niveau);
+             });
+
+ Route::get('/liste-reqecole',function(){
+                    $listes = get_liste_ecole(0,0,0,-1,0);
+              return   response()->json($listes);
+             });  
+
+
+ Route::get('/liste-responsable',function(){
+              return  valider_responsable();
+             });     
+   
+
+
+});
 // ============================ directeur ====================================================
 
 Route::group(['middleware' => ['auth:api','direct']], function () {
@@ -202,18 +241,13 @@ Route::group(['middleware' => ['auth:api','admin']], function () {
     Route::patch('/update-user', 'HomeController@updateUser')->name('updateuser');
     Route::patch('/edit-user/{id}', 'UserController@edit_user');
     Route::patch('/user-level/{id}', 'UserController@editPrivileges');
-     Route::get('user/delete/{id}', 'UserController@destroy');
-     Route::get('get-suggestion','SuggestionController@index')->name('getsuggestion');
+    Route::get('user/delete/{id}', 'UserController@destroy');
+    Route::get('get-suggestion','SuggestionController@index')->name('getsuggestion');
     Route::patch('update-suggestion/{id}','SuggestionController@update_lu')->name('updatesuggestion');
     Route::delete('delete-suggestion/{id}','SuggestionController@destroy')->name('deletesuggestion');
     Route::delete('delete-group-suggestion/{id}','SuggestionController@destroy_group')->name('delgroupsuggestion');
-   
-    Route::get('/liste-responsable',function(){
-              return  valider_responsable();
-             }); 
-
-    
-    
+    Route::get('/generate-formation/{id}', 'EleveController@generateFormation');
+     
     Route::patch('/update-responsable/{id}',function($id){
               return  update_responsable($id);
              }); 

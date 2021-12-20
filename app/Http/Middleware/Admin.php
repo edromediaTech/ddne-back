@@ -16,7 +16,7 @@ class Admin
     public function handle($request, Closure $next)
      {
         if(Auth::check()){
-          if(Auth::user()-> user_level > 5){
+          if(Auth::user()->user_level > 5){
             return $next($request);
           }
           Session::flash('msg', ' Vous devez etre Adm. ');

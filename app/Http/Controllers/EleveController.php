@@ -9,6 +9,8 @@ use App\Classe;
 use App\Directeur;
 use App\Zone;
 use App\Departement;
+use App\Abandon;
+use App\Expulse;
 use Response,Str,DB;
 use Illuminate\Http\Request;
 
@@ -64,13 +66,12 @@ class EleveController extends Controller
             //$eleves = get_eleve_info();
                 //$decisions = get_decision($ecoles, $classes);
                
-
         return view('adminView.decision',compact(['districts','communes','zones','ecoles','directeurs','classes','departements','deci']));
     }
 
     public function get_decision($id){
         $data = explode('|', $id);
-        $decisions = get_decision($data[0],$data[1], $data[2]);         
+        $decisions = get_decision($data[0], $data[1], $data[2]);         
         return Response::json($decisions);        
     }
 
@@ -353,8 +354,9 @@ public function get_perform_ope_json($data){
         $datael =[
                  'nom'=>$data->nom,'prenom'=>$data->prenom,'datenais'=>$data->datenais,'lieunais'=>$data->lieunais,'dept_n'=>$data->dept_n,'sexe'=>$data->sexe,'prenom_mere'=>$data->prenom_mere, 'deficience'=>$data->deficience,'tel_persrep'=>$data->tel_persrep
                 ];
-            $datacl =['ecole_id'=>$data->ecole_id,'classe_id'=>$data->classe_id,'anac'=>'2020-2021'];
+            $datacl =['ecole_id'=>$data->ecole_id,'classe_id'=>$data->classe_id,'anac'=>$data_id[2]];
              $classeleve= update_data('Classeleve',$datacl, $data_id[0]);
+
             $eleve= update_data('Eleve',$datael, $data_id[1]);
             if($eleve['status']== 0){
               $msg_error = $msg_error.'eleve erreur!'.'->Message:'.$eleve['message'];
