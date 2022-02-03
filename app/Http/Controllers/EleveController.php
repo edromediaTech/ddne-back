@@ -21,6 +21,14 @@ class EleveController extends Controller
      *
      * @return \Illuminate\Http\Response
      */
+
+    public function TransfertEleveAdmin($id){
+             $data = explode('|', $id);
+              $listeEleve = get_liste_eleve_trans($data[0], $data[1], $data[2], $data[3], $data[4]);             
+              return Response::json($listeEleve);
+
+        }
+
     public function index(){
              $districts = District::all();
             $communes = Commune::all();
@@ -33,6 +41,13 @@ class EleveController extends Controller
              $comm = get_commune_dept();
 
         return view('supervision.saisieEleve',compact(['districts','communes','zones','ecoles','directeurs','classes','departements','eleves','comm']));
+    }
+
+
+    public function search_eleve($id){
+         $data = explode('|', $id); 
+         $el = get_recherche_eleve($data[0], $data[1], $data[2], $data[3]);
+         return response()->json($el);
     }
 
  public function ecole_pncs(){
@@ -301,7 +316,14 @@ public function get_perform_ope_json($data){
    public function generateFormation($data)
     {
         $donnee = explode('|', $data);
-        $promotion =  promotion_classe($donnee[0], $donnee[1],  session_new_year());
+        $promotion =  promotion_classe($donnee[0], $donnee[1],  $donnee[2]);
+        return $promotion;
+    }
+
+public function generateFormationPrec($data)
+    {
+        $donnee = explode('|', $data);
+        $promotion =  promotion_classe($donnee[0], $donnee[1],  $donnee[2]);
         return $promotion;
     }
 
@@ -370,6 +392,17 @@ public function get_perform_ope_json($data){
         $liste_eleve = get_eleve_classe($data[0],$data[1]);
 
         return Response::json($liste_eleve);
+    }
+
+    public function update_transfert($id){
+        $data = explode('|', $id);
+                try{
+           $trans =  \App\Classeleve::find($data[0])->update(['ecole_id' =>$data[1]]);
+           return 1;
+         }
+         catch(\Illuminate\Database\QueryException $ex){
+            return 0;
+         }
     }
 
     /**

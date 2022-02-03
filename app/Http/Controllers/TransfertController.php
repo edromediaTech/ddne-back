@@ -114,6 +114,25 @@ class TransfertController extends Controller
         return Response::json(1);
     }
 
+
+     public function TransfertAdmin($id)
+    {
+        $data = explode('|', $id);
+        for($i=0; $i < count($data); $i++){
+            $trans = Transfert::find($data[$i]); 
+            $trans->valider = 1 ;  
+            $trans->etat = 1; 
+             $trans->accepter = 1;  
+            $trans->anacne = session_new_year();   
+             $trans->save();
+            $cle = \App\Classeleve::find($trans->classeleve_id);
+            $cle->ecole_id = $trans->ecolecible;
+            $cle->save();
+         } 
+           
+            return Response::json(1);
+    }
+
     /**
      * Remove the specified resource from storage.
      *

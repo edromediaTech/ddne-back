@@ -467,6 +467,16 @@ public function supprime_ecole($ecole_id){
         //
     }
 
+    public function get_etat(){
+    $form_id = 1;
+          $form = Form::find($form_id);
+          $groupes = Groupe::where('form_id', $form_id)->get();
+          $options = get_form_option($form_id);
+          $questions = get_form_question($form_id);
+          $sectioncommunales= Section_communale::select('id as value',  'nom as text')->get();
+      return  response()->json(compact('form','groupes','options','questions','sectioncommunales'));
+
+  }
     /**
      * Remove the specified resource from storage.
      *

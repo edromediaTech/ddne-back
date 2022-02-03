@@ -26,16 +26,22 @@ Route::get('/get-anac', function(){
 
 
 // statistisques =======================================
- Route::get('/get-info',function(){   
+ 
+
+
+Route::get('/get-all-info',function(){  
+                $anac = session_new_year();
              $ecoles =\App\Ecole::all()->count(); 
              $enseignants =\App\Enseignant::all()->count(); 
-             $eleves = \App\Eleve::all()->count();    
-             $filles = \App\Eleve::where('sexe',0)->count();
-               $elevedis = stat_eleve_par_district();    
+             $eleves = \App\Classeleve::where('anac', $anac)->count();    
+             $filles = \DB::table('classeleves')
+                        ->join('eleves', 'classeleves.eleve_id','eleves.id')->where('sexe',0)
+                        ->where('anac', $anac)->count();
+               $elevedis = stat_eleve_par_district($anac);    
                $ecoledis = stat_ecole_par_district();  
-               $deci = stat_decision(); 
-              $secteur =  get_eleveSecteur(); 
-          return response()->json(['filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis,'enseignants'=>$enseignants, 'deci'=>$deci, 'secteur'=>$secteur]);
+               $deci = stat_decision($anac); 
+              $secteur =  get_eleveSecteur($anac); 
+          return response()->json(['anac'=>$anac,'filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis,'enseignants'=>$enseignants, 'deci'=>$deci, 'secteur'=>$secteur]);
              });
 
 
@@ -122,7 +128,7 @@ Route::group(['middleware' => ['auth:api','inspect']], function () {
 
 // ============================ super ====================================================
 
-Route::group(['middleware' => ['auth:api','sup']], function () {
+//Route::group(['middleware' => ['auth:api','sup']], function () {
 
  Route::get('/get-ecole', 'EcoleController@listeEcole');
    
@@ -149,19 +155,18 @@ Route::group(['middleware' => ['auth:api','sup']], function () {
    
 
 
-});
-// ============================ directeur ====================================================
+//});
+// ============================ operateur ====================================================
 
-Route::group(['middleware' => ['auth:api','direct']], function () {
-
-    Route::get('/stat-ecole',function(){
-                    $ecoles = stat_eleveTotal();
-              return response()->json($ecoles);
-             });
-    
-  Route::get('/departement', function(){        
+Route::group(['middleware' => ['auth:api','ope']], function () {
+ Route::get('/departement', function(){        
          return get_dept();
     });
+
+ Route::get('/liste-annee', function(){        
+         return  get_liste_annee();
+    });
+
 
  Route::get('/get-departement/{dept_id}', function($dept_id){
         $dept = get_district_by_dept($dept_id);
@@ -184,7 +189,77 @@ Route::group(['middleware' => ['auth:api','direct']], function () {
  Route::get('/get-ecole/{ecole_id}',function($ecole_id){
       return get_niveau_by_ecole($ecole_id);
      }); 
+ Route::get('/get-classe/{type}',function($type){          
+    return get_classe($type);
+});
 
+Route::get('/get-commune-dept/{commune_id}', function($commune_id){
+      return get_commune_by_dept($commune_id);         
+    });
+
+Route::get('/get-ecole-commune/{ecole_id}', function($ecole_id){
+      return get_ecole_by_commune($ecole_id);
+         
+    });
+
+ Route::get('/get-enseignant-ecole/{ecole_id}',function($ecole_id){
+      return get_enseignant_by_ecole($ecole_id);
+     }); 
+Route::get('/get-enseignant-matiere/{enseignant_id}',function($enseignant_id){
+      return get_matiere_by_enseignant($enseignant_id);
+     }); 
+
+ Route::get('/getEcole',function(){          
+    return \App\Ecole::select('id as value', 'nom as text')->orderBy('nom','asc')->get();
+});
+
+ Route::get('/get-eleve/{id}',function($id){
+        $data = explode('|', $id);
+      return  response()->json(get_eleve_classe($data[0],$data[1], $data[2]));
+     });
+
+ Route::patch('/eleve-trans/{id}','TransfertController@TransfertAdmin');
+ Route::get('/get-eleve-trans/{id}','EleveController@TransfertEleveAdmin');
+ Route::get('/get-etat','EcoleController@get_etat');
+Route::post('eleve-store','EleveController@store_eleve')->name('eleveStore');
+Route::patch('eleve-edit/{id}','EleveController@update')->name('eleveEdit');
+Route::delete('eleve-delete/{id}','EleveController@destroy')->name('eleveDelete');
+Route::get('get-decision/{id}', 'EleveController@get_decision')->name('getdecision'); 
+Route::patch('update-decision', 'EleveController@update_decision')->name('updatedecision');
+ Route::post('/store-data-ecole', 'EcoleController@store');
+ Route::get('/generate-formation/{id}', 'EleveController@generateFormation');
+ Route::get('/search-eleve/{id}', 'EleveController@search_eleve');
+ Route::patch('/update-eleve-trans/{id}', 'EleveController@update_transfert');
+
+
+  Route::get('/get-info-prec',function(){ 
+            $anprec = annee_prec();  
+             $ecoles =\App\Ecole::all()->count(); 
+             $enseignants =\App\Enseignant::all()->count(); 
+             $eleves = \App\Classeleve::where('anac', annee_prec())->count();    
+             $filles = \DB::table('classeleves')
+                        ->join('eleves', 'classeleves.eleve_id','eleves.id')->where('sexe',0)
+                        ->where('anac', annee_prec())->count();
+               $elevedis = stat_eleve_par_district_anprec();    
+               $ecoledis = stat_ecole_par_district();  
+               $deci = stat_decision_anprec(); 
+              $secteur =  get_eleveSecteur_anprec(); 
+          return response()->json(['anprec'=>$anprec,'filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis,'enseignants'=>$enseignants, 'deci'=>$deci, 'secteur'=>$secteur]);
+             });
+
+});
+
+
+// ============================ directeur ====================================================
+
+Route::group(['middleware' => ['auth:api','direct']], function () {
+
+    Route::get('/stat-ecole',function(){
+                    $ecoles = stat_eleveTotal();
+              return response()->json($ecoles);
+             });
+    
+  
  Route::get('/total-eleve',function($ecole_id, $niveau, $anac){
       return total_eleve_par_classe($ecole_id, $niveau, $anac);
      });
@@ -205,33 +280,22 @@ Route::group(['middleware' => ['auth:api','direct']], function () {
       return get_eleve_accepter($id);
      });
 
- Route::get('/get-eleve/{id}',function($id){
-        $data = explode('|', $id);
-      return  response()->json(get_eleve_classe($data[0],$data[1], $data[2]));
-     });
+ 
 
  Route::get('/total-eleve/{id}',function($id){
       $data = explode('|', $id);
       $fille = total_fille_par_classe($data[0], $data[1], $data[2]);
       $total = total_eleve_par_classe($data[0], $data[1], $data[2]);
-      return response()->json(['fille'=>$fille, 'total'=>$total]);
-     });
+         return response()->json(['fille'=>$fille, 'total'=>$total]);
+    });
 
 Route::post('cert-trans','TransfertController@store')->name('certTrans');
 Route::patch('accepter/{id}','TransfertController@update')->name('accepter');
 Route::post('store-suggestion','SuggestionController@store')->name('storesuggestion');
- Route::get('/check-responsable','EcoleresponsableController@check-responsable')->name('checkresponsable');
+Route::get('/check-responsable','EcoleresponsableController@check-responsable')->name('checkresponsable');
 Route::get('/get-classe-responsable/{id}','EcoleresponsableController@liste_classe')->name('listeClasse');  
 Route::post('store-responsable','EcoleresponsableController@store_responsable')->name('storeresponsable');
-Route::post('eleve-store','EleveController@store_eleve')->name('eleveStore');
-Route::patch('eleve-edit/{id}','EleveController@update')->name('eleveEdit');
-Route::delete('eleve-delete/{id}','EleveController@destroy')->name('eleveDelete');
-Route::get('get-decision/{id}', 'EleveController@get_decision')->name('getdecision'); 
-Route::patch('update-decision', 'EleveController@update_decision')->name('updatedecision');
 Route::delete('delete-group-trans/{id}','TransfertController@destroy_group')->name('delgrouptrans');
-Route::get('/get-classe/{type}',function($type){          
-    return get_classe($type);
-});
 
  });
 
@@ -246,7 +310,24 @@ Route::group(['middleware' => ['auth:api','admin']], function () {
     Route::patch('update-suggestion/{id}','SuggestionController@update_lu')->name('updatesuggestion');
     Route::delete('delete-suggestion/{id}','SuggestionController@destroy')->name('deletesuggestion');
     Route::delete('delete-group-suggestion/{id}','SuggestionController@destroy_group')->name('delgroupsuggestion');
-    Route::get('/generate-formation/{id}', 'EleveController@generateFormation');
+    
+    Route::get('/generate-formation-prec/{id}', 'EleveController@generateFormationPrec');
+
+    Route::get('/get-info/{anac}',function($anac){  
+   
+             $ecoles =\App\Ecole::all()->count(); 
+             $enseignants =\App\Enseignant::all()->count(); 
+             $eleves = \App\Classeleve::where('anac', $anac)->count();    
+             $filles = \DB::table('classeleves')
+                        ->join('eleves', 'classeleves.eleve_id','eleves.id')->where('sexe',0)
+                        ->where('anac', $anac)->count();
+               $elevedis = stat_eleve_par_district($anac);    
+               $ecoledis = stat_ecole_par_district();  
+               $deci = stat_decision($anac); 
+              $secteur =  get_eleveSecteur($anac); 
+          return response()->json(['filles'=>$filles, 'ecoles'=>$ecoles, 'eleves'=>$eleves, 'ecoledis'=>$ecoledis, 'elevedis'=>$elevedis,'enseignants'=>$enseignants, 'deci'=>$deci, 'secteur'=>$secteur]);
+             });
+
      
     Route::patch('/update-responsable/{id}',function($id){
               return  update_responsable($id);
@@ -258,6 +339,9 @@ Route::group(['middleware' => ['auth:api','admin']], function () {
  
   Route::get('/get-perform-decisions',function(){
               return  get_performance_decisions();
+             });
+  Route::get('/set-anac/{anac}',function($anac){
+              return  set_annee($anac);
              });
 
      Route::get('online-user', 'UserController@index'); 

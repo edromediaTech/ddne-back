@@ -37,5 +37,5 @@ Route::get('/test-niv',function () {
 
 
 Route::get('test-help', function () {    
-      return get_liste_enseignant(41);
+      return  get_ecole_by_commune(29);
 });

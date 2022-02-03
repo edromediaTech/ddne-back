@@ -1,11 +1,108 @@
 <?php
+
+function get_liste_annee(){
+   return \App\Annee::select('annee as value','annee as text')->orderBy('annee','asc')->get();
+}
+
+function get_liste_eleve_trans($district=0,$commune=null, $zone=null,  $ecole = null, $classe=null){
+    $query = DB::table('classeleves');
+             $query->join('eleves','classeleves.eleve_id','eleves.id')           
+            ->join('classes','classeleves.classe_id','classes.id')
+            ->join('ecoles','classeleves.ecole_id','ecoles.id')
+            ->join('zones','ecoles.zone_id','zones.id')
+            ->join('communes','zones.commune_id','communes.id')
+            ->join('districts','communes.district_id','districts.id')
+            ->join('departements','districts.departement_id','departements.id')
+           // ->where('departements.id',$dept)
+             ->where('anac', session_new_year());           
+           
+
+          $query->select('ecoles.id as ecole_id','ecoles.nom as ecole','sexe','eleves.id as id','eleves.nom','prenom','datenais','prenom_mere','tel_persrep','classes.id as classe_id','nomclasse','lieunais', 'classeleves.id as classeleve_id');
+
+
+    if($district == 0){
+      //$query->get();
+    }
+    elseif($commune ==0){
+      $query->where('districts.id', $district);
+    }
+      elseif($zone ==0){
+          $query->where('districts.id', $district)->where('communes.id', $commune);
+      }
+      elseif($ecole ==0){
+          $query->where('communes.id', $commune)->where('zones.id', $zone);
+      }
+    elseif($classe ==0){
+          $query->where('communes.id', $commune)->where('zones.id', $zone)->where('ecoles.id', $ecole);
+      }
+              else{
+                 $query->where('communes.id', $commune)->where('zones.id', $zone)->where('ecoles.id', $ecole)->where('classes.id', $classe);
+              }
+
+    if($classe != 0)
+      $query->where('classes.id',$classe);
+               
+
+     $listeEleve = $query->orderBy('districts.nom', 'asc' )
+             ->orderbyRaw("concat(eleves.nom,' ',eleves.prenom)")
+            ->get();
+    
+    return $listeEleve;
+}
+
+
 function user_level(){
   $users = \DB::table("users")->select("*", \DB::raw('(CASE 
            WHEN users.user_level = "0" THEN "User" 
            WHEN users.user_level = "1" THEN "Admin"
            ELSE "SuperAdmin"  END) AS status_lable'))->get();
-
     dd($users);
+}
+
+function get_recherche_eleve($nom, $prenom=null, $datenais=null, $prenom_mere=null){
+    $req= DB::table('classeleves')
+            ->join('eleves','classeleves.eleve_id','eleves.id')
+            ->join('ecoles','classeleves.ecole_id','ecoles.id')
+            ->join('classes','classeleves.classe_id','classes.id')
+            ->join('section_communales','ecoles.section_communale_id','section_communales.id');
+          $req->select('eleves.id as eleve_id', 'classeleves.id','eleves.nom', 'eleves.prenom', 'ecoles.nom as ecole','classes.nomclasse', 'datenais', 'prenom_mere', 'anac as annee');
+          $req->where('eleves.nom', $nom);
+          if($prenom != '')
+            $req->where('prenom',$prenom);
+
+            if($prenom_mere != null)
+            $req->where('prenom_mere',$prenom_mere);
+          if($datenais != null)
+            $req->where('datenais',$datenais);
+
+           $listeEleve = $req->orderBy('eleves.nom', 'asc' )
+             ->orderbyRaw("concat(eleves.nom,' ',eleves.prenom)")
+             ->get();
+    
+    return $listeEleve;
+}
+
+
+function get_commune_by_dept($dept){
+    return DB::table('communes')
+            ->join('districts','communes.district_id','districts.id')
+            ->join('departements','districts.departement_id','departements.id')
+            ->where('departement_id', $dept)
+            ->select('communes.nom as text', 'communes.id as value')
+            ->orderBy('communes.nom')
+            ->get();
+
+}
+
+function get_ecole_by_commune($commune){
+    return DB::table('ecoles')
+            ->join('section_communales','ecoles.section_communale_id','section_communales.id')
+            ->join('communes','section_communales.commune_id','communes.id')
+            ->where('commune_id', $commune)
+            ->select('ecoles.nom as text', 'ecoles.id as value')
+            ->orderBy('ecoles.nom')
+            ->get();
+
 }
 
 
@@ -21,7 +118,6 @@ function get_enseignant(){
               ->select('enseignants.id','enseignants.nom','ecoles.nom as ecole','communes.nom as commune','nomclasse','enseignants.prenom','classes.id as classe_id','enseignants.telephone','sexe', 'nif', 'districts.nom as district','nomf')
               ->get();
               return count($enseignants);
-
 }
 
 
@@ -92,12 +188,22 @@ function get_performance_decisions(){
 }
 
 
-function get_eleveSecteur(){
+function get_eleveSecteur($anac){
   return DB::table('classeleves')
              ->select(DB::raw("count(CASE WHEN ecoles.secteur = '0' THEN 1 END ) AS  Prive"),
                  DB::raw("count(CASE WHEN ecoles.secteur = '1' THEN 1  END) AS Public"))
                    ->join('ecoles', 'classeleves.ecole_id', 'ecoles.id')
-          ->where('anac',session_new_year())
+          ->where('anac',$anac)
+          ->get();
+
+}
+
+function get_eleveSecteur_anprec(){
+  return DB::table('classeleves')
+             ->select(DB::raw("count(CASE WHEN ecoles.secteur = '0' THEN 1 END ) AS  Prive"),
+                 DB::raw("count(CASE WHEN ecoles.secteur = '1' THEN 1  END) AS Public"))
+                   ->join('ecoles', 'classeleves.ecole_id', 'ecoles.id')
+          ->where('anac',annee_prec())
           ->get();
 
 }
@@ -417,6 +523,29 @@ function get_ecole_by_zone($zone_id){
     return \App\Ecole::where('zone_id', $zone_id)->select('id as value', 'nom as text')->get();
 }
 
+function get_enseignant_by_ecole($ecole_id){
+    return DB::table('affectations')
+        ->join('ecoles','affectations.ecole_id','ecoles.id')
+        ->join('enseignants','affectations.enseignant_id','enseignants.id')
+        ->where('ecole_id', $ecole_id)
+        ->select('enseignants.id as value', DB::raw("concat(enseignant_id,' ',enseignants.nom,' ',prenom) as text"))
+        ->orderby('enseignants.nom')
+        ->get();
+}
+
+function get_matiere_by_enseignant($enseignant_id){
+   return DB::table('classe_matieres')       
+        ->join('classes','classe_matieres.classe_id','classes.id')
+        ->join('matieres','classe_matieres.matiere_id','matieres.id')
+         ->join('affectations','affectations.classe_id','classes.id')
+        ->join('enseignants','affectations.enseignant_id','enseignants.id')        
+        ->where('enseignant_id', $enseignant_id)
+        ->select('matieres.id as value', 'libelle as text')
+        ->orderby('libelle')
+        ->groupBy('matieres.id')
+        ->get();
+}
+
 function get_ecole_by_inspecteur($zone_id, $id){
     $type = \App\Insprincipal::find($id)->type;
      $req =  DB::table('ecoles')
@@ -544,6 +673,13 @@ function update_responsable($id){
     return true;
 }
 
+function annee_prec(){
+    $annees = explode('-', get_current_year());
+    $an = $annees[0];
+    $anprec = $an - 1;
+    $anv= ($anprec.'-'.$an);  
+    return $anv;
+  }
 
 // recuperation de la derniere annee dans la table annees
 
@@ -573,9 +709,17 @@ function update_responsable($id){
 // creation session avec nouvelle annee
 
   function session_new_year(){
+    if(Session::has('anac'))
+       return session('anac');
     $nv = get_current_year();
     session(['anac' => $nv]);
     return session('anac');
+  }
+
+  //set annee
+  function set_annee($anac){
+    session(['anac' => $anac]);
+    return session('anac'); 
   }
 
 function get_last_decision($classeleve_id){ 
@@ -1556,12 +1700,23 @@ function insert($ModelName, $champfill, $champval){
   }
 }
 
-function stat_decision(){
+function stat_decision($anac){
     $dec = DB::table('decisions')
     ->join('classeleves', 'decisions.classeleve_id', 'classeleves.id')
-    ->where('anac',session_new_year())->count();
+    ->where('anac',$anac)->where('mention','<>','Select mention')->count();
 
-    $el = \App\Classeleve::where('anac', session_new_year())->count();
+    $el = \App\Classeleve::where('anac', $anac)->count();
+
+    $percent =number_format(( $dec / $el)*100, 2);
+    return  ['percent'=>$percent, 'dec'=>$dec];
+  }
+
+  function stat_decision_anprec(){
+    $dec = DB::table('decisions')
+    ->join('classeleves', 'decisions.classeleve_id', 'classeleves.id')
+    ->where('anac',annee_prec())->where('mention','<>','Select mention')->count();
+
+    $el = \App\Classeleve::where('anac', annee_prec())->count();
 
     $percent =number_format(( $dec / $el)*100, 2);
     return  ['percent'=>$percent, 'dec'=>$dec];
@@ -1628,8 +1783,8 @@ function perform_operat($dated, $datef){
 
 }
 
-function stat_eleve_par_district(){
-  $anac = session_new_year();
+function stat_eleve_par_district($anac){
+  
   $nb_ecole =   DB::table('classeleves')
                 ->select('districts.nom','districts.id',  DB::raw('count(eleves.id) as nb_eleve'))
                  ->join('eleves','classeleves.eleve_id','eleves.id')
@@ -1638,6 +1793,20 @@ function stat_eleve_par_district(){
                  ->join('communes','zones.commune_id','communes.id')
                 ->join('districts','communes.district_id','districts.id')
                 ->where('anac', $anac)
+                ->groupBy('districts.nom','districts.id')
+                ->orderBy('districts.nom', 'asc' )
+                ->get();
+           return($nb_ecole);
+}
+function stat_eleve_par_district_anprec(){
+   $nb_ecole =   DB::table('classeleves')
+                ->select('districts.nom','districts.id',  DB::raw('count(eleves.id) as nb_eleve'))
+                 ->join('eleves','classeleves.eleve_id','eleves.id')
+                 ->join('ecoles','classeleves.ecole_id','ecoles.id')
+                 ->join('zones','ecoles.zone_id','zones.id')
+                 ->join('communes','zones.commune_id','communes.id')
+                ->join('districts','communes.district_id','districts.id')
+                ->where('anac', annee_prec())
                 ->groupBy('districts.nom','districts.id')
                 ->orderBy('districts.nom', 'asc' )
                 ->get();
@@ -1659,7 +1828,7 @@ function get_eleve_info(){
             ->orderBy('districts.nom', 'asc' )
              ->orderbyRaw("concat(eleves.nom,' ',eleves.prenom)")
             ->get();
-           return ($nb_ecole);
+           return $nb_ecole;
 }
 
 
@@ -1795,6 +1964,8 @@ function update_decision($data){
          $info = ['annee'=>$data->annee, 'nordre'=>$data->nordre, 'decision_id'=>$id];   
            if(update_data('Infoneuf', $info, $info_id)['status'] ==1)
              return 1;
+           else
+            return 0;
       }
       return 1;
     }
