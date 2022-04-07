@@ -36,6 +36,18 @@ Route::get('/test-niv',function () {
 });
 
 
-Route::get('test-help', function () {    
-      return  get_ecole_by_commune(29);
+Route::get('test-help', function () {  
+       $niveau= ['Prescolaire' =>'0001',
+           'Fondamental'=>'0110',
+           'Secondaire'=>'1000',
+           'Ecole Complete'=>'1111',
+            'Fondamental 1er et 2eme cycle'=>'0010',
+            'Prescolaire et Fondamental 1er et 2eme cycle'=>'0011',
+            'Prescolaire et Fondamental complet'=>'0111',
+           'Fondamental 3eme Cycle et Secondaire'=>'1100',
+           'Fondamental et Secondaire'=>'1110',
+           '3e Cycle'=>'0100'];
+        return getKey($niveau, '1000');
+        // formationU($data, 'J0J03092');  
+     
 });

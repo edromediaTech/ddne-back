@@ -24,10 +24,9 @@ class EleveController extends Controller
 
     public function TransfertEleveAdmin($id){
              $data = explode('|', $id);
-              $listeEleve = get_liste_eleve_trans($data[0], $data[1], $data[2], $data[3], $data[4]);             
+              $listeEleve = get_liste_eleve_trans($data[0], $data[1], $data[2], $data[3], $data[4]);    
               return Response::json($listeEleve);
-
-        }
+            }
 
     public function index(){
              $districts = District::all();
@@ -182,54 +181,24 @@ class EleveController extends Controller
      */
     public function store_eleve(Request $request)
     {
+
         $msg_error ='';
           $data = json_decode($request->getContent());
           $data->nom =strtoupper($data->nom);
-
-        if( $data->tel_persrep=='')
+        if($data->tel_persrep=='')
           $data->tel_persrep='0000-0000';
-        if( $data->prenom_mere=='')
+        if($data->prenom_mere =='')
           $data->prenom_mere='Ma00';
           $data->prenom = ucfirst($data->prenom);
           $sexe = $data->sexe;
 
-        if(Eleve::all()->count()>0){
-            $lastrecord=DB::table('eleves')->latest()->first();
-            $last=$lastrecord->id;
-          }
-          else{
-            $last="00000000";
-
-          }
-
-          $lastid=Str::substr($last, 3, 5);
-
-          $enscount=(int) $lastid;
-          $enscount++;
-
-         $frmt=$enscount;
-          if($enscount<10)
-             {
-            $frmt='0000'.$frmt;
-          }
-           elseif($enscount<100){
-            $frmt='000'.$frmt;
-          }
-          elseif($enscount<1000){
-            $frmt='00'.$frmt;
-          }
-          elseif($enscount<10000){
-            $frmt='0'.$frmt;
-          }
-            else{
-              $frmt=$frmt;
-            }
-
-          $frmt=Str::substr($data->nom, 0, 1).$sexe.Str::substr($data->prenom, 0, 1).$frmt;
-
-        $msg_error = '';
+        $frmt = create_ideleve($data->nom, $data->prenom_mere, $data->sexe);   
+       // $frmt = 'R1D0000406';             
+         
+                 
 
         $datael = ['id'=>$frmt,'nom'=>$data->nom,'prenom'=>$data->prenom,'datenais'=>$data->datenais,'lieunais'=>$data->lieunais,'dept_n'=>$data->dept_n,'sexe'=>$data->sexe,'prenom_mere'=>ucfirst($data->prenom_mere), 'deficience'=>$data->deficience,'tel_persrep'=>$data->tel_persrep, 'user_id'=>\Auth::user()->id];
+            
              $eleve= store_data('Eleve',$datael);
 
             if($eleve['status'] == 1){
@@ -403,6 +372,89 @@ public function generateFormationPrec($data)
          catch(\Illuminate\Database\QueryException $ex){
             return 0;
          }
+    }
+
+
+    public function abandon($id){
+            $data= explode('|', $id);
+            $classeleve =  \App\Classeleve::find($data[0]); 
+            $datacl = ['ecole_id'=>$data[1],                       
+                        'status'=>'Redoublant',
+                        'classe_id'=>$classeleve->classe_id,
+                        'eleve_id'=>$classeleve->eleve_id,
+                        'anac'=>$data[2],
+                      ];
+            $reintegrate =  store_data('Classeleve', $datacl);
+           if($reintegrate['status'] == 1){
+                 try {
+                      $ab =  \App\Abandon::find($data[3])->update(['restaurer' =>1]);
+                         return 1;
+                     }
+                catch(\Illuminate\Database\QueryException $ex){
+                      return 0;
+                     }
+                 }
+            else
+                return 0;
+    }
+
+
+    public function expulse($id){
+         $data = explode('|', $id);
+         $classeleve =  \App\Classeleve::find($data[0]); 
+          $datacl = ['ecole_id'=>$data[1],                       
+                     'status'=>'Nouveau',
+                     'classe_id'=>$classeleve->classe_id + 1,
+                     'eleve_id'=>$classeleve->eleve_id, 
+                     'anac'=>$data[2],
+                    ];
+       //  $mention = \App\Decision::find($data[4])->pluck('mention')[0];
+       if($data[5] == 'Admis ailleurs'){
+             $eleves = store_data('Classeleve', $datacl);
+             if($eleves['status'] == 0){
+                        \Log::debug($eleves['message']); 
+                        return 0;
+                }
+             else{
+                // if($eleves['status'] == 1){
+                     try {
+                         $ab =  \App\Expulse::find($data[3])->update(['reintegrer' =>1]);
+                         return 1;
+                       }
+                     catch(\Illuminate\Database\QueryException $ex){
+                        \Log::debug($eleves['message']); 
+                        return 0;
+                       }
+                 // }
+                 // else
+                 //     return 0;                        
+              }                            
+           }
+
+       else{
+                 $datacl['classe_id'] = $classeleve->classe_id;
+                 $datacl['status'] = 'Redoublant';
+                $eleves = store_data('Classeleve', $datacl);
+             if($eleves['status'] == 0){
+                \Log::debug($classeleve['message']);
+                   return 0; 
+                }
+             else{
+               
+                  try {
+                      $ab =  \App\Expulse::find($data[3])->update(['reintegrer'=>1]);
+                         return 1;
+                     }
+                   catch(\Illuminate\Database\QueryException $ex){
+                    \Log::debug($eleves['message']); 
+                      return 0;
+                     }
+                
+                    // return 0;
+              //   return 1;
+                }     
+          }
+          
     }
 
     /**

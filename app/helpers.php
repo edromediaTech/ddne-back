@@ -4,6 +4,15 @@ function get_liste_annee(){
    return \App\Annee::select('annee as value','annee as text')->orderBy('annee','asc')->get();
 }
 
+function get_classe_by_niveau($niveau_id){
+  return \App\Classe::select('nomclasse as text', 'id as value')->where('niveau_id', $niveau_id)->get();
+}
+
+function get_classe_by_niveau_prof($niveau_id){
+  return \App\Classe::select('nomclasse as name', 'id')->where('niveau_id', $niveau_id)->get();
+}
+
+
 function get_liste_eleve_trans($district=0,$commune=null, $zone=null,  $ecole = null, $classe=null){
     $query = DB::table('classeleves');
              $query->join('eleves','classeleves.eleve_id','eleves.id')           
@@ -83,7 +92,16 @@ function get_recherche_eleve($nom, $prenom=null, $datenais=null, $prenom_mere=nu
 }
 
 
-function get_commune_by_dept($dept){
+function get_commune_by_dept1($dept){
+    return DB::table('communes')
+            ->join('districts','communes.district_id','districts.id')
+            ->join('departements','districts.departement_id','departements.id')
+            ->where('departement_id', $dept)
+            ->select('communes.nom as name', 'communes.id')
+            ->orderBy('communes.nom')
+            ->get();
+
+}function get_commune_by_dept($dept){
     return DB::table('communes')
             ->join('districts','communes.district_id','districts.id')
             ->join('departements','districts.departement_id','departements.id')
@@ -100,6 +118,16 @@ function get_ecole_by_commune($commune){
             ->join('communes','section_communales.commune_id','communes.id')
             ->where('commune_id', $commune)
             ->select('ecoles.nom as text', 'ecoles.id as value')
+            ->orderBy('ecoles.nom')
+            ->get();
+
+}
+function get_ecole_by_commune_prof($commune){
+    return DB::table('ecoles')
+            ->join('section_communales','ecoles.section_communale_id','section_communales.id')
+            ->join('communes','section_communales.commune_id','communes.id')
+            ->where('commune_id', $commune)
+            ->select('ecoles.nom as name', 'ecoles.id')
             ->orderBy('ecoles.nom')
             ->get();
 
@@ -195,8 +223,29 @@ function get_eleveSecteur($anac){
                    ->join('ecoles', 'classeleves.ecole_id', 'ecoles.id')
           ->where('anac',$anac)
           ->get();
-
 }
+
+function stat_eleve_certificat(){
+  return DB::table('classeleves')
+               ->select('ecoles.nom as ecole', 'nomd', 'directeurs.prenom','teld',
+                 DB::raw("count(CASE WHEN eleves.sexe = '0' THEN 1 END ) AS  nb_fille"),
+                 DB::raw("count(CASE WHEN eleves.sexe = '1' THEN 1  END) AS nb_garcon"),
+                 DB::raw('count(eleves.id) as total'))                
+                  ->join('eleves','classeleves.eleve_id','eleves.id')
+                 ->join('ecoles','classeleves.ecole_id','ecoles.id')
+                 ->join('directeurs','directeurs.ecole_id','ecoles.id')
+                 ->join('zones','ecoles.zone_id','zones.id')
+                  ->join('section_communales','ecoles.section_communale_id','section_communales.id')
+                  ->join('communes','zones.commune_id','communes.id')
+                 ->where('secteur', 1)
+                 ->where('classe_id',9)
+                 ->where('anac','2020-2021')
+                ->groupBy('ecoles.nom', 'nomd', 'directeurs.prenom','teld')
+               ->orderBy('ecoles.nom', 'asc' )
+                ->get();         
+}
+
+
 
 function get_eleveSecteur_anprec(){
   return DB::table('classeleves')
@@ -569,6 +618,10 @@ function get_ecole_by_inspecteur($zone_id, $id){
 
 function get_niveau_by_ecole($ecole_id){
     return \App\Niveauenseignement::where('ecole_id', $ecole_id)->select('niveau1 as text')->get()[0];
+}
+
+function get_niveau_by_ecole_prof($ecole_id){      
+    return \App\Niveauenseignement::where('ecole_id', $ecole_id)->pluck('niveau1')[0];
 }
 
 function get_suggestions(){
@@ -1003,9 +1056,25 @@ function imploadValue($types){
     return ($an.'-'.$ansuiv);
   }
 
+  function ecoleSecondairebyDistrict($district){
+    $ecole =   DB::table('ecoles')                
+                 ->join('niveauenseignements','niveauenseignements.ecole_id','ecoles.id')         
+                 ->join('zones','ecoles.zone_id','zones.id')
+                 ->join('communes','zones.commune_id','communes.id')
+                ->join('districts','communes.district_id','districts.id')                
+                ->where('niveau1','like', '%1%%')
+               ->where('districts.id', $district)
+                ->select('ecoles.nom','code','niveau', 'niveau1')               
+                ->orderBy('ecoles.nom', 'asc' )
+                ->get();
+                return $ecole;
+  }
+
+
   function ecolePncs(){
     $nb_ecole =   DB::table('ecoles')
-                ->select('ecoles.nom as Etablissement','nomd as Nom','directeurs.prenom as Prenom','directeurs.teld as Telephone','communes.nom as Commune',  DB::raw('count(eleves.id) as Effectif'))
+                ->select('ecoles.nom as Etablissement','nomd as Nom','directeurs.prenom as Prenom','directeurs.
+                  teld as Telephone','communes.nom as Commune',  DB::raw('count(eleves.id) as Effectif'))
                  ->join('directeurs','directeurs.ecole_id','ecoles.id')
                  ->join('niveauenseignements','niveauenseignements.ecole_id','ecoles.id')
                   ->join('classeleves','classeleves.ecole_id','ecoles.id')
@@ -1013,8 +1082,7 @@ function imploadValue($types){
                  ->join('zones','ecoles.zone_id','zones.id')
                  ->join('communes','zones.commune_id','communes.id')
                 ->join('section_communales','ecoles.section_communale_id','section_communales.id')
-                ->where('secteur',1)
-                ->where('niveau','<>','Secondaire')
+                ->where('secteur',1)                
                 ->groupBy('communes.nom','directeurs.nomd','directeurs.prenom','directeurs.teld','ecoles.nom')
                 ->orderBy('ecoles.nom', 'asc' )
                 ->get();
@@ -1139,11 +1207,13 @@ function imploadValue($types){
 
 function liste_eleve_abandonne(){
   $abandons = DB::table('abandons')
-  ->join('classeleves', 'abandons.classeleve_id', 'classeleves.id')
-   ->join('eleves','classeleves.eleve_id','eleves.id')
+    ->join('classeleves', 'abandons.classeleve_id', 'classeleves.id')
+     ->join('eleves','classeleves.eleve_id','eleves.id')
   ->join('classes','classeleves.classe_id','classes.id')
   ->join('ecoles','classeleves.ecole_id','ecoles.id')
-  ->select('eleves.id as ID Elève','eleves.nom as Nom', 'prenom as Prenom', 'nomclasse as Classe', 'ecoles.nom as Ecole', 'anac as Année')
+  ->join('decisions','decisions.classeleve_id','classeleves.id')
+  ->where('restaurer', 0)
+  ->select('eleves.id as eleve_id','eleves.nom', 'prenom', 'nomclasse', 'ecoles.nom as ecole', 'anac as annee', 'abandons.id as abandon_id','prenom_mere', 'classeleves.id', 'decisions.id as decision_id')
   ->get();
   return $abandons;
 }
@@ -1154,7 +1224,9 @@ function liste_eleve_expulse(){
    ->join('eleves','classeleves.eleve_id','eleves.id')
   ->join('classes','classeleves.classe_id','classes.id')
   ->join('ecoles','classeleves.ecole_id','ecoles.id')
-  ->select('eleves.id as ID Elève','eleves.nom as Nom', 'prenom as Prenom', 'nomclasse as Classe', 'ecoles.nom as Ecole', 'anac as Année')
+  ->join('decisions','decisions.classeleve_id','classeleves.id')
+  ->where('reintegrer',0)
+  ->select('eleves.id as eleve_id','expulses.id as expulse_id','eleves.nom', 'prenom', 'nomclasse', 'ecoles.nom as ecole', 'anac as annee', 'prenom_mere', 'classeleves.id', 'decisions.id as decision_id','mention')
   ->get();
   return $expulses;
 }
@@ -1357,8 +1429,116 @@ function liste_eleve_expulse(){
   //  if($montant -$montantdepligne <0 )
   //      return 0;
   //     return 1;
-  //     }
+  //     
 
+ function create_stringID($nom, $prenom,$sexe){
+   $nom =strtoupper($nom);
+          $prenom = ucfirst($prenom);
+          $sexe = $sexe;
+
+
+
+    //block of code to be executed;
+
+
+          if(\App\Enseignant::all()->count()>0){
+            $lastrecord=DB::table('enseignants')->latest()->first();
+            $last=$lastrecord->id;
+          }
+          else{
+            $last="00000000";
+          }
+          $bid = false;
+while ($bid == false){
+          $lastid=Str::substr($last, 3, 5);
+          $enscount=(int) $lastid;
+          $enscount++;
+
+         $frmt=$enscount;
+          if($enscount<10)
+             {
+            $frmt='0000'.$frmt;
+          }
+           elseif($enscount<100){
+            $frmt='000'.$frmt;
+          }
+          elseif($enscount<1000){
+            $frmt='00'.$frmt;
+          }
+          elseif($enscount<10000){
+            $frmt='0'.$frmt;
+          }
+            else{
+              $frmt=$frmt;
+            }
+            if(\App\Enseignant::find($frmt) == null )
+              $bid = true; 
+            else  
+              $last = $frmt;         
+
+}
+         return (Str::substr($nom, 0, 1).$sexe.Str::substr($prenom, 0, 1).$frmt);
+
+ }
+
+
+
+
+ function create_ideleve($nom, $prenom, $sexe){
+          
+    //block of code to be executed;
+
+
+// return count(\App\Eleve::all());
+
+          if(\App\Eleve::count() >0){
+            // return 'R1D0040569';
+              $lastrecord=DB::table('eleves')->latest()->first();
+            $last=$lastrecord->id;
+          }
+          else{
+            $last="0000000000";
+          }
+          $bid = false;
+      while ($bid == false){
+          $lastid=Str::substr($last, 3, 7);
+          $enscount=(int) $lastid;
+          $enscount++;
+
+         $frmt=$enscount;
+          if($enscount<10)
+             {
+            $frmt='000000'.$frmt;
+          }
+           elseif($enscount<100){
+            $frmt='00000'.$frmt;
+          }
+          elseif($enscount<1000){
+            $frmt='0000'.$frmt;
+          }
+          elseif($enscount<10000){
+            $frmt='000'.$frmt;
+          }
+          elseif($enscount<100000){
+            $frmt='00'.$frmt;
+          }
+          elseif($enscount<1000000){
+            $frmt='0'.$frmt;
+          }
+            else{
+              $frmt=$frmt;
+            }
+            if(\App\Eleve::find($frmt) == null )
+              $bid = true; 
+            else  
+              $last = $frmt;         
+
+}
+//return 'R1D0040569';
+         return (Str::substr($nom, 0, 1).$sexe.Str::substr($prenom, 0, 1).$frmt);
+
+
+ }
 
 
   function prof_exist($nif){
@@ -1368,7 +1548,15 @@ function liste_eleve_expulse(){
  return 0;
   }
 
-  function get_matiere_classe($classe_id){
+  function get_matiere_classe_prof($classe_id){
+    return DB::table('matieres')
+    ->join('classe_matieres','classe_matieres.matiere_id', 'matieres.id')
+    ->join('classes','classe_matieres.classe_id', 'classes.id')
+    ->where('classes.id', $classe_id )
+    ->select('libelle as name','matieres.id as id')
+    ->get();
+  }
+function get_matiere_classe($classe_id){
     return DB::table('matieres')
     ->join('classe_matieres','classe_matieres.matiere_id', 'matieres.id')
     ->join('classes','classe_matieres.classe_id', 'classes.id')
@@ -2237,6 +2425,19 @@ $ecoles= DB::table('zones')
 ->get();
 return $ecoles;
 }
+
+function addRestoQuest($quest){
+  if(count($quest) > 0){
+      $data = collect();
+      foreach($quest as $q){
+          $q->option_id = '';
+          $data->push($q);
+      }
+       return $data;
+  }
+  return $quest;
+}
+
 function get_form_question($form_id){
     $questions = DB::table('questionnaires')
     ->join('groupes', 'questionnaires.groupe_id','groupes.id')
@@ -2246,14 +2447,14 @@ function get_form_question($form_id){
     ->get();
     return($questions);
 }
-
+ 
 function get_form_option($form_id){
     $options = DB::table('options')
     ->join('questionnaires', 'options.questionnaire_id', 'questionnaires.id')
    ->join('groupes', 'questionnaires.groupe_id','groupes.id')
     ->join('forms', 'groupes.form_id','forms.id')
     ->where('forms.id', $form_id)
-    ->select('options.id','options.libelle','questionnaires.id as question_id')
+    ->select('options.id as value','options.libelle as text','questionnaires.id as question_id')
     ->get();
     return($options);
 }
@@ -2715,7 +2916,7 @@ $query->join('directeurs','directeurs.ecole_id','ecoles.id')
 ->join('districts','communes.district_id','districts.id')
 ->join('niveauenseignements','niveauenseignements.ecole_id','ecoles.id');
 
-$query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel as tel','email as Email Ecole','districts.nom as District','communes.nom as Commune', 'zones.nom as Zone','section_communales.nom as Section_Communale', 'sigle as Sigle', 'fondateur as Fondateur','acces as Acces', 'niveau as Niveau_Enseignement','secteur as Secteur', 'ecoles.longitude as Longitude','ecoles.latitude as Latitude', 'nomd as Nom_Directeur', 'prenom as Prenom_Directeur', 'teld as Tel_Directeur','telephoned as Tel Directeur2','emaild as Email', 'cin as CIN', 'nif as NIF', 'datenais as Date Naissance', 'lieunais as Lieu de Naissance','sexe as Sexe','adressed as Adresse Directeur');
+$query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel as tel','email as Email Ecole','districts.nom as District','communes.nom as Commune', 'zones.nom as Zone','section_communales.nom as Section_Communale', 'sigle as Sigle', 'fondateur as Fondateur','acces as Acces', 'niveau as Niveau_Enseignement','secteur as Secteur', 'ecoles.longitude as Longitude','ecoles.latitude as Latitude', 'nomd as Nom_Directeur', 'prenom as Prenom_Directeur', 'teld as Tel_Directeur','telephoned as Tel Directeur2','emaild as Email', 'cin as CIN', 'nif as NIF', 'datenais as Date Naissance', 'lieunais as Lieu de Naissance','sexe as Sexe','adressed as Adresse Directeur', 'niveau1');
 
 
     if($district == 0){
@@ -2735,12 +2936,34 @@ $query->select('ecoles.id','ecoles.nom as Ecole','code as Code','Adresse', 'tel 
       if ($secteur != -1) {
          $query->where('secteur', $secteur);
       }
-      if($niv !=0){
+
+      
+      
+ if($niv !=0){
+
           if(strlen($niv) != 5)
              $query->where('niveau1', $niv);
-          else{
-            $c_niveau = check_niveau($niv);
-              $query->where('niveau1' ,'like', $c_niveau);
+          else{     
+          // secondaire inclus            
+                if($niv == -1000){
+                  $query->where('niveau1' ,'like', '1___');
+                }
+            // 3e cycle inclus
+                 if($niv == -0100){
+                  $query->where('niveau1' ,'like', '_1__');
+                }
+            // 1 et 2 cycle inclus
+                if($niv == -0010){
+                  $query->where('niveau1' ,'like', '__1_');
+                }
+              // prescolaire inclus
+                if($niv == -0001){
+                  $query->where('niveau1' ,'like', '___1');
+                }
+            //     else{
+            // $c_niveau = check_niveau($niv);
+            //   $query->where('niveau1' ,'like', $c_niveau);
+            // }
             }
       }
 
@@ -2884,6 +3107,14 @@ function get_niveau($n){
        if($n==0)
             return $niveau;
             return array_merge($niveau, $niveau2);
+}
+
+function getKey($tab, $val){
+  foreach($tab as  $key => $value){
+    if($value == $val)
+      return $key;
+  }
+
 }
 
 
@@ -3069,6 +3300,7 @@ function get_id_inspecteur($user_id){
             }
             catch(\Illuminate\Database\QueryException $ex){
                  $message = $ex->getMessage();
+                 \Log::debug($message);
                  $status = 0;
                 }
        }
@@ -3096,6 +3328,7 @@ function update_data($model, $donnee, $id) {
       }
       catch(\Illuminate\Database\QueryException $ex){
            $message = $ex->getMessage();
+           \Log::debug($message);
             $codeError = $ex->getCode();
            $status = 0;
           }
@@ -3181,7 +3414,8 @@ function store_data($model, $donnee) {
       }
       catch(\Illuminate\Database\QueryException $ex){
            $message = $ex->getMessage();
-           $codeError = $ex->getCode();
+            \Log::debug($message);
+          $codeError = $ex->getCode();
            $status = 0;
           }
 

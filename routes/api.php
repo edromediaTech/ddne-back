@@ -24,6 +24,7 @@ Route::get('/get-anac', function(){
 });
 
 
+Route::get('/get-info-prof-cours/{id}', 'EnseignantController@get_info_cours');
 
 // statistisques =======================================
  
@@ -158,13 +159,45 @@ Route::group(['middleware' => ['auth:api','inspect']], function () {
 //});
 // ============================ operateur ====================================================
 
+// Route::group(['middleware' => ['auth:api', 'ope']], function () {
+//     Route::post('eleve-store','EleveController@store_eleve')->name('eleveStore')->middleware('cors');
+// });
+
 Route::group(['middleware' => ['auth:api','ope']], function () {
+     Route::post('eleve-store','EleveController@store_eleve')->name('eleveStore');
  Route::get('/departement', function(){        
          return get_dept();
     });
 
+ Route::get('/check-prof/{nif}', function($nif){
+  return prof_exist($nif);
+ });
+
+ Route::get('/ecole-niveau/{ecole_id}', function($ecole_id){        
+         return  get_niveau_by_ecole($ecole_id);
+    });
+
+Route::get('/classe-matiere/{classe_id}', function($classe_id){        
+         return get_matiere_classe($classe_id);
+    });
+
  Route::get('/liste-annee', function(){        
          return  get_liste_annee();
+    }); 
+
+ Route::get('/liste-certificat', function(){        
+         return stat_eleve_certificat();
+    });
+
+ Route::get('/ecole-secondaire/{id}', function($id){        
+         return ecoleSecondairebyDistrict($id);
+    });
+
+ Route::get('/liste-expulse', function(){        
+         return  liste_eleve_expulse();
+    });
+ Route::get('/liste-abandon', function(){        
+         return  liste_eleve_abandonne();
     });
 
 
@@ -193,14 +226,15 @@ Route::group(['middleware' => ['auth:api','ope']], function () {
     return get_classe($type);
 });
 
-Route::get('/get-commune-dept/{commune_id}', function($commune_id){
-      return get_commune_by_dept($commune_id);         
+Route::get('/get-commune-dept/{dept}', function($dept){
+      return get_commune_by_dept($dept);         
     });
 
 Route::get('/get-ecole-commune/{ecole_id}', function($ecole_id){
       return get_ecole_by_commune($ecole_id);
          
     });
+
 
  Route::get('/get-enseignant-ecole/{ecole_id}',function($ecole_id){
       return get_enseignant_by_ecole($ecole_id);
@@ -221,7 +255,7 @@ Route::get('/get-enseignant-matiere/{enseignant_id}',function($enseignant_id){
  Route::patch('/eleve-trans/{id}','TransfertController@TransfertAdmin');
  Route::get('/get-eleve-trans/{id}','EleveController@TransfertEleveAdmin');
  Route::get('/get-etat','EcoleController@get_etat');
-Route::post('eleve-store','EleveController@store_eleve')->name('eleveStore');
+
 Route::patch('eleve-edit/{id}','EleveController@update')->name('eleveEdit');
 Route::delete('eleve-delete/{id}','EleveController@destroy')->name('eleveDelete');
 Route::get('get-decision/{id}', 'EleveController@get_decision')->name('getdecision'); 
@@ -230,7 +264,9 @@ Route::patch('update-decision', 'EleveController@update_decision')->name('update
  Route::get('/generate-formation/{id}', 'EleveController@generateFormation');
  Route::get('/search-eleve/{id}', 'EleveController@search_eleve');
  Route::patch('/update-eleve-trans/{id}', 'EleveController@update_transfert');
-
+ Route::post('/abandon-store/{id}', 'EleveController@abandon');
+ Route::post('/store-enseignant', 'EnseignantController@store_enseignant');
+ 
 
   Route::get('/get-info-prec',function(){ 
             $anprec = annee_prec();  
